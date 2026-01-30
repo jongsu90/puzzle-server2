@@ -53,6 +53,16 @@ io.on('connection', (socket) => {
         }
         
         const room = rooms.get(roomId);
+		
+		if (room.image) {
+			socket.emit('image-loaded', {
+				image: room.image,
+				puzzleConfig: room.puzzleConfig,
+				uploadedBy: room.uploadedBy,
+				// 셔플된 상태인지 확인하기 위해 현재 조각들 위치 정보도 보냄
+				currentPositions: room.groups 
+			});
+		}
         
         // 사용자별 고유 색상 할당
         userColor = COLORS[room.users.size % COLORS.length];
@@ -86,23 +96,16 @@ io.on('connection', (socket) => {
     
     // 이미지 업로드 (Base64)
     socket.on('upload-image', (data) => {
-        if (!currentRoom) return;
-        
-        const room = rooms.get(currentRoom);
-        if (!room) return;
-        
-        room.image = data.image;
-        room.puzzleConfig = data.puzzleConfig;
-        room.pieces = {};
-        room.groups = {};
-        room.dragging = {};
-        
-        // 모든 사용자에게 전송
-        io.to(currentRoom).emit('image-loaded', {
-            image: data.image,
-            puzzleConfig: data.puzzleConfig,
-            uploadedBy: userName
-        });
+		if (currentRoom && rooms.has(currentRoom)) {
+			const room = rooms.get(currentRoom);
+			room.image = data.image;
+			room.puzzleConfig = data.puzzleConfig;
+			room.uploadedBy = userName;
+			room.groups = {}; // 새 이미지이므로 위치 초기화
+
+			// 방 전체에 알림
+			io.to(currentRoom).emit('image-loaded', data);
+		}
         
         console.log(`${userName} 님이 이미지 업로드 (방: ${currentRoom})`);
     });
